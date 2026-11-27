@@ -1,6 +1,7 @@
-# NovaGuard 위협 데이터: 매일 새벽 4시(한국 시간)에 모아 서명해서 'threat-data' 릴리즈에 올린다.
-# 필요: 저장소 Settings > Secrets and variables > Actions 에 NOVAGUARD_UPDATE_KEY
-#       (installer/cert/novaguard_update_key.pem 내용 전체)
+# SinsulGuard 위협 데이터: 매일 새벽 4시(한국 시간)에 모아 서명해서 'threat-data' 릴리즈에 올린다.
+# 필요: 저장소 Settings > Secrets and variables > Actions 에 SINSULGUARD_UPDATE_KEY
+#       (installer/cert/sinsulguard_update_key.pem 내용 전체). 예전 이름 NOVAGUARD_UPDATE_KEY 만 있어도 동작함.
+# 옛 이름(NovaGuard, 1.5.x)으로 설치된 PC 를 위해 같은 파일을 novaguard-threat.txt 로도 올린다 (모두 옮겨 가면 빼도 됨).
 name: threat-data
 on:
   schedule:
@@ -12,22 +13,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 위협 정보 모으기
-        run: python3 tools/build_threat.py --out novaguard-threat.txt
+        run: python3 tools/build_threat.py --out sinsulguard-threat.txt
       - name: 서명
         env:
-          KEY: ${{ secrets.NOVAGUARD_UPDATE_KEY }}
+          KEY: ${{ secrets.SINSULGUARD_UPDATE_KEY || secrets.NOVAGUARD_UPDATE_KEY }}
         run: |
           umask 077
           printf '%s\n' "$KEY" > key.pem
-          openssl dgst -sha256 -sign key.pem -out novaguard-threat.txt.sig novaguard-threat.txt
+          openssl dgst -sha256 -sign key.pem -out sinsulguard-threat.txt.sig sinsulguard-threat.txt
           rm -f key.pem
+          cp sinsulguard-threat.txt novaguard-threat.txt
+          cp sinsulguard-threat.txt.sig novaguard-threat.txt.sig
       - name: 릴리즈에 올리기
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view threat-data >/dev/null 2>&1 || \
             gh release create threat-data --title "위협 데이터 (매일 자동 갱신)" \
-              --notes "NovaGuard 가 매일 받는 위협 데이터입니다. 프로그램 릴리즈가 아닙니다." --latest=false
-          gh release upload threat-data novaguard-threat.txt novaguard-threat.txt.sig --clobber
+              --notes "SinsulGuard 가 매일 받는 위협 데이터입니다. 프로그램 릴리즈가 아닙니다." --latest=false
+          gh release upload threat-data sinsulguard-threat.txt sinsulguard-threat.txt.sig \
+            novaguard-threat.txt novaguard-threat.txt.sig --clobber
